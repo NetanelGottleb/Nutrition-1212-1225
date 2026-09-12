@@ -14,7 +14,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# התאמת כיווניות ועיצוב (RTL)
 st.markdown("""
 <style>
     .stApp { direction: rtl; text-align: right; }
@@ -90,7 +89,9 @@ def get_office_updates():
             return f.read().strip()
     return "אין עדכונים חריגים מהמזכירות."
 
+@st.cache_data(ttl=86400)
 def fetch_shnaton_info(course_id):
+    """שליפה מהשנתון עם שמירה בזיכרון מטמון ל-24 שעות"""
     url = f"https://shnaton.huji.ac.il/course/{course_id}"
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -101,6 +102,49 @@ def fetch_shnaton_info(course_id):
     except Exception:
         pass
     return f"לצפייה בפרטי הקורס המלאים בשנתון: {url}"
+
+@st.cache_data(ttl=86400)
+def get_ai_response(query_text, course_data, updates_text):
+    """מנגנון עיבוד עם Cache: שאלות חוזרות נשלפות ב-0 טוקנים מהזיכרון"""
+    prompt = f"""
+אתה העוזר של מחזור מדעי התזונה באוניברסיטה העברית (נציג המחזור: נתנאל גוטליב).
+ענה אך ורק על בסיס הנתונים הבאים וצרף קישורים רשמיים.
+
+מבנה המסלולים והקורסים:
+- מסלול 712-1212 (מדעי התזונה 4 שנתי):
+  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1212
+  * קורסי חובה: {list(c_1212_mand.keys())}
+  * קורסי חובת בחירה: {list(c_1212_elec.keys())}
+
+- מסלול 712-1225 (מדעי התזונה עם חטיבה באגרו-אינפורמטיקה):
+  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1225
+  * קורסי חובה: {list(c_1225_mand.keys())}
+  * קורסי חובת בחירה חוג: {list(c_1225_elec_dept.keys())}
+  * קורסי חובת בחירה חטיבה באגרו: {list(c_1225_elec_agro.keys())}
+
+עדכוני מזכירות אחרונים:
+{updates_text}
+
+קישורים רשמיים כלליים:
+- תקנון לימודים: https://studentsadmin.huji.ac.il/study
+- פרק 7 (בחינות ומועדים מיוחדים): https://studentsadmin.huji.ac.il/exams
+- שנתון העברית: https://shnaton.huji.ac.il
+- פורטל מידע אישי: https://studentservices.huji.ac.il
+
+מידע שנשלף מהשנתון עבור קורס ספציפי (אם נשאל):
+{course_data}
+
+כללים:
+1. הפניה לשנתון לפי מסלול: אם השאלה נוגעת למסלול 1212 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1212, ואם היא נוגעת למסלול 1225 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1225.
+2. אבחנה בחובת בחירה של 1225: הקפד להבדיל בבירור בין קורסי חובת בחירה של החוג לבין קורסי חובת בחירה של חטיבת אגרו-אינפורמטיקה.
+3. לפניות אישיות: הפנה ישירות לנתנאל גוטליב, נציג המחזור.
+4. סגנון: ענייני, תמציתי (עד 3 משפטים) ובעברית.
+
+שאלת הסטודנט: {query_text}
+"""
+    model = genai.GenerativeModel("gemini-1.5-flash")
+    response = model.generate_content(prompt)
+    return response.text if response.text else "לא התקבלה תשובה, אנא נסח מחדש."
 
 # ניהול היסטוריית שיחה
 if "messages" not in st.session_state:
@@ -146,47 +190,9 @@ if user_query:
 
     office_updates = get_office_updates()
 
-    prompt = f"""
-אתה העוזר של מחזור מדעי התזונה באוניברסיטה העברית (נציג המחזור: נתנאל גוטליב).
-ענה אך ורק על בסיס הנתונים הבאים וצרף קישורים רשמיים. 
-
-מבנה המסלולים והקורסים:
-- מסלול 712-1212 (מדעי התזונה 4 שנתי):
-  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1212
-  * קורסי חובה: {list(c_1212_mand.keys())}
-  * קורסי חובת בחירה: {list(c_1212_elec.keys())}
-
-- מסלול 712-1225 (מדעי התזונה עם חטיבה באגרו-אינפורמטיקה):
-  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1225
-  * קורסי חובה: {list(c_1225_mand.keys())}
-  * קורסי חובת בחירה חוג: {list(c_1225_elec_dept.keys())}
-  * קורסי חובת בחירה חטיבה באגרו: {list(c_1225_elec_agro.keys())}
-
-עדכוני מזכירות אחרונים:
-{office_updates}
-
-קישורים רשמיים כלליים:
-- תקנון לימודים: https://studentsadmin.huji.ac.il/study
-- פרק 7 (בחינות ומועדים מיוחדים): https://studentsadmin.huji.ac.il/exams
-- שנתון העברית: https://shnaton.huji.ac.il
-- פורטל מידע אישי: https://studentservices.huji.ac.il
-
-מידע שנשלף מהשנתון עבור קורס ספציפי (אם נשאל):
-{shnaton_data}
-
-כללים:
-1. הפניה לשנתון לפי מסלול: אם השאלה נוגעת למסלול 1212 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1212, ואם היא נוגעת למסלול 1225 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1225.
-2. אבחנה בחובת בחירה של 1225: הקפד להבדיל בבירור בין קורסי חובת בחירה של החוג לבין קורסי חובת בחירה של חטיבת אגרו-אינפורמטיקה.
-3. לפניות אישיות: הפנה ישירות לנתנאל גוטליב, נציג המחזור.
-4. סגנון: ענייני, תמציתי (עד 3 משפטים) ובעברית.
-
-שאלת הסטודנט: {user_query}
-"""
-
+    # שליפה דרך פונקציית ה-Cache
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
-        reply = response.text
+        reply = get_ai_response(user_query.strip(), shnaton_data, office_updates)
     except Exception:
         reply = "אירעה שגיאה בעיבוד השאילתה. ניתן לפנות ישירות לנתנאל, נציג המחזור."
 
