@@ -35,7 +35,7 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# 2. כותרת, סמלים וכפתורי ניווט מהירים
+# 2. כותרת עליונה וסמלים
 st.markdown("""
 <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 2px solid #2e7d32; margin-bottom: 18px; background-color: #ffffff; border-radius: 8px;">
     <div>
@@ -49,17 +49,22 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.link_button("תקנון ונהלים", "https://studentsadmin.huji.ac.il/study", use_container_width=True)
-with col2:
-    st.link_button("שנתון הקורסים", "https://shnaton.huji.ac.il", use_container_width=True)
-with col3:
-    st.link_button("פורטל מידע אישי", "https://studentservices.huji.ac.il", use_container_width=True)
+# 3. כפתורי שנתון מפוצלים וגישה מהירה
+col_r1_1, col_r1_2 = st.columns(2)
+with col_r1_1:
+    st.link_button("שנתון מסלול 1212 (חד-חוגי)", "https://shnaton.huji.ac.il/roadmap/712-1212", use_container_width=True)
+with col_r1_2:
+    st.link_button("שנתון מסלול 1225 (עם אגרו-אינפורמטיקה)", "https://shnaton.huji.ac.il/roadmap/712-1225", use_container_width=True)
+
+col_r2_1, col_r2_2 = st.columns(2)
+with col_r2_1:
+    st.link_button("תקנון ונהלים (מינהל תלמידים)", "https://studentsadmin.huji.ac.il/study", use_container_width=True)
+with col_r2_2:
+    st.link_button("פורטל מידע אישי לסטודנט", "https://studentservices.huji.ac.il", use_container_width=True)
 
 st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
 
-# 3. טעינת כלל קובצי הקורסים לפי מסלולים וקטגוריות
+# 4. טעינת קובצי הקורסים
 def load_json_file(filename):
     if os.path.exists(filename):
         with open(filename, "r", encoding="utf-8") as f:
@@ -75,7 +80,6 @@ c_1225_mand = load_json_file("courses_1225_mandatory.json")
 c_1225_elec_dept = load_json_file("courses_1225_elective_dept.json")
 c_1225_elec_agro = load_json_file("courses_1225_elective_agro.json")
 
-# מאגר איחוד של שמות ומספרי קורסים
 ALL_COURSES = {}
 for d in [c_1212_mand, c_1212_elec, c_1225_mand, c_1225_elec_dept, c_1225_elec_agro]:
     ALL_COURSES.update(d)
@@ -146,28 +150,35 @@ if user_query:
 אתה העוזר של מחזור מדעי התזונה באוניברסיטה העברית (נציג המחזור: נתנאל גוטליב).
 ענה אך ורק על בסיס הנתונים הבאים וצרף קישורים רשמיים. 
 
-מבנה המסלולים:
-- מסלול 712-1212: מדעי התזונה, חד-חוגי, ארבע שנתי (150 נ"ז). קורסי חובה: {list(c_1212_mand.keys())[:15]}... חובת בחירה חוגית: {list(c_1212_elec.keys())}.
-- מסלול 712-1225: מדעי התזונה עם חטיבה באגרו-אינפורמטיקה (150.5 נ"ז). חובה: {list(c_1225_mand.keys())[:15]}... חובת בחירה חוג: {list(c_1225_elec_dept.keys())}. חובת בחירה חטיבה באגרו: {list(c_1225_elec_agro.keys())}.
+מבנה המסלולים והקורסים:
+- מסלול 712-1212 (מדעי התזונה 4 שנתי):
+  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1212
+  * קורסי חובה: {list(c_1212_mand.keys())}
+  * קורסי חובת בחירה: {list(c_1212_elec.keys())}
 
-עדכוני מזכירות אחרונים (עדיפות עליונה אם נוגעים לשאלה):
+- מסלול 712-1225 (מדעי התזונה עם חטיבה באגרו-אינפורמטיקה):
+  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1225
+  * קורסי חובה: {list(c_1225_mand.keys())}
+  * קורסי חובת בחירה חוג: {list(c_1225_elec_dept.keys())}
+  * קורסי חובת בחירה חטיבה באגרו: {list(c_1225_elec_agro.keys())}
+
+עדכוני מזכירות אחרונים:
 {office_updates}
 
-קישורים רשמיים:
+קישורים רשמיים כלליים:
 - תקנון לימודים: https://studentsadmin.huji.ac.il/study
-- פרק 7 (בחינות): https://studentsadmin.huji.ac.il/exams
+- פרק 7 (בחינות ומועדים מיוחדים): https://studentsadmin.huji.ac.il/exams
 - שנתון העברית: https://shnaton.huji.ac.il
-- מפת מסלול 1212: https://shnaton.huji.ac.il/roadmap/712-1212
-- מפת מסלול 1225: https://shnaton.huji.ac.il/roadmap/712-1225
 - פורטל מידע אישי: https://studentservices.huji.ac.il
 
 מידע שנשלף מהשנתון עבור קורס ספציפי (אם נשאל):
 {shnaton_data}
 
 כללים:
-1. הבדלה בין מסלולים: אם שואלים על חובת בחירה או חובה, ציין בבירור אם מדובר במסלול 1212 או 1225 (ובהבחנה בין בחירה חוגית לבחירת חטיבה באגרו).
-2. לפניות אישיות: הפנה לנתנאל גוטליב, נציג המחזור.
-3. סגנון: ענייני, תמציתי (עד 3 משפטים) ובעברית.
+1. הפניה לשנתון לפי מסלול: אם השאלה נוגעת למסלול 1212 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1212, ואם היא נוגעת למסלול 1225 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1225.
+2. אבחנה בחובת בחירה של 1225: הקפד להבדיל בבירור בין קורסי חובת בחירה של החוג לבין קורסי חובת בחירה של חטיבת אגרו-אינפורמטיקה.
+3. לפניות אישיות: הפנה ישירות לנתנאל גוטליב, נציג המחזור.
+4. סגנון: ענייני, תמציתי (עד 3 משפטים) ובעברית.
 
 שאלת הסטודנט: {user_query}
 """
