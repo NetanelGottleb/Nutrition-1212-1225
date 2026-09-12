@@ -1,4 +1,6 @@
 import os
+import re
+import json
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -33,7 +35,7 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# 2. חלק עליון: סמל הפקולטה לחקלאות וסמל מדעי התזונה
+# 2. כותרת, סמלים וכפתורי ניווט מהירים
 st.markdown("""
 <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 2px solid #2e7d32; margin-bottom: 18px; background-color: #ffffff; border-radius: 8px;">
     <div>
@@ -42,12 +44,11 @@ st.markdown("""
     <div style="text-align: left; line-height: 1.2;">
         <span style="font-size: 17px; font-weight: bold; color: #1b5e20; display: block;">האוניברסיטה העברית בירושלים</span>
         <span style="font-size: 14px; font-weight: 600; color: #333;">בית הספר למדעי התזונה</span>
-        <span style="font-size: 12px; color: #666; display: block;">מסלולים 712-1212 | 712-1225</span>
+        <span style="font-size: 12px; color: #666; display: block;">חוג 712 | מסלולים 1212 ו-1225</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# 3. כפתורי גישה מהירה קבועים בראש העמוד
 col1, col2, col3 = st.columns(3)
 with col1:
     st.link_button("תקנון ונהלים", "https://studentsadmin.huji.ac.il/study", use_container_width=True)
@@ -58,19 +59,26 @@ with col3:
 
 st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
 
-# 4. מיפוי קורסים בתואר
-COURSES_MAP = {
-    "כימיה כללית": "71011",
-    "כימיה אורגנית": "71014",
-    "גנטיקה": "71012",
-    "חדוא": "71013",
-    "חדו\"א": "71013",
-    "אינפי": "71013",
-    "ביוכימיה": "71015",
-    "אנטומיה": "71016",
-    "פיזיולוגיה": "71017",
-    "סטטיסטיקה": "71018"
-}
+# 3. טעינת כלל קובצי הקורסים לפי מסלולים וקטגוריות
+def load_json_file(filename):
+    if os.path.exists(filename):
+        with open(filename, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except Exception:
+                pass
+    return {}
+
+c_1212_mand = load_json_file("courses_1212_mandatory.json")
+c_1212_elec = load_json_file("courses_1212_elective.json")
+c_1225_mand = load_json_file("courses_1225_mandatory.json")
+c_1225_elec_dept = load_json_file("courses_1225_elective_dept.json")
+c_1225_elec_agro = load_json_file("courses_1225_elective_agro.json")
+
+# מאגר איחוד של שמות ומספרי קורסים
+ALL_COURSES = {}
+for d in [c_1212_mand, c_1212_elec, c_1225_mand, c_1225_elec_dept, c_1225_elec_agro]:
+    ALL_COURSES.update(d)
 
 def get_office_updates():
     if os.path.exists("updates.txt"):
@@ -100,7 +108,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-user_query = st.chat_input("שאל/י על קורס, מועדי בחינות, תקנון או נהלים...")
+user_query = st.chat_input("שאל/י על קורס, חובת בחירה, מסלול 1212/1225, תקנון...")
 
 if user_query:
     current_time = time.time()
@@ -117,11 +125,16 @@ if user_query:
     with st.chat_message("user"):
         st.write(user_query)
 
+    # זיהוי מספר קורס בן 5 ספרות או שם קורס
     matched_course_id = None
-    for name, cid in COURSES_MAP.items():
-        if name in user_query or cid in user_query:
-            matched_course_id = cid
-            break
+    number_match = re.search(r'\b\d{5}\b', user_query)
+    if number_match:
+        matched_course_id = number_match.group(0)
+    else:
+        for name, cid in ALL_COURSES.items():
+            if name in user_query:
+                matched_course_id = cid
+                break
 
     shnaton_data = ""
     if matched_course_id:
@@ -133,22 +146,27 @@ if user_query:
 אתה העוזר של מחזור מדעי התזונה באוניברסיטה העברית (נציג המחזור: נתנאל גוטליב).
 ענה אך ורק על בסיס הנתונים הבאים וצרף קישורים רשמיים. 
 
+מבנה המסלולים:
+- מסלול 712-1212: מדעי התזונה, חד-חוגי, ארבע שנתי (150 נ"ז). קורסי חובה: {list(c_1212_mand.keys())[:15]}... חובת בחירה חוגית: {list(c_1212_elec.keys())}.
+- מסלול 712-1225: מדעי התזונה עם חטיבה באגרו-אינפורמטיקה (150.5 נ"ז). חובה: {list(c_1225_mand.keys())[:15]}... חובת בחירה חוג: {list(c_1225_elec_dept.keys())}. חובת בחירה חטיבה באגרו: {list(c_1225_elec_agro.keys())}.
+
 עדכוני מזכירות אחרונים (עדיפות עליונה אם נוגעים לשאלה):
 {office_updates}
 
-קישורים רשמיים קבועים:
-- תקנון לימודים ומינהל תלמידים: https://studentsadmin.huji.ac.il/study
-- פרק 7 (בחינות ומועדים מיוחדים): https://studentsadmin.huji.ac.il/exams
+קישורים רשמיים:
+- תקנון לימודים: https://studentsadmin.huji.ac.il/study
+- פרק 7 (בחינות): https://studentsadmin.huji.ac.il/exams
 - שנתון העברית: https://shnaton.huji.ac.il
+- מפת מסלול 1212: https://shnaton.huji.ac.il/roadmap/712-1212
+- מפת מסלול 1225: https://shnaton.huji.ac.il/roadmap/712-1225
 - פורטל מידע אישי: https://studentservices.huji.ac.il
-- מסלול מדעי התזונה (1212 ו-1225): https://info.huji.ac.il/bachelor/Nutrition-Sciences
 
-מידע נקודתי שנשלף לשאילתה זו:
+מידע שנשלף מהשנתון עבור קורס ספציפי (אם נשאל):
 {shnaton_data}
 
 כללים:
-1. לשאלות אישיות או מורכבות: הפנה ישירות לנתנאל גוטליב, נציג המחזור.
-2. לשאלות כלליות על בחינות ללא קורס ספציפי: הפנה למידע האישי ולשנתון, ובקש שם קורס ממוקד.
+1. הבדלה בין מסלולים: אם שואלים על חובת בחירה או חובה, ציין בבירור אם מדובר במסלול 1212 או 1225 (ובהבחנה בין בחירה חוגית לבחירת חטיבה באגרו).
+2. לפניות אישיות: הפנה לנתנאל גוטליב, נציג המחזור.
 3. סגנון: ענייני, תמציתי (עד 3 משפטים) ובעברית.
 
 שאלת הסטודנט: {user_query}
