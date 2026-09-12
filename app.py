@@ -5,7 +5,16 @@ import time
 import requests
 from bs4 import BeautifulSoup
 import streamlit as st
-import google.generativeai as genai
+
+# תמיכה בספרייה החדשה (google-genai) עם תאימות לאחור
+try:
+    from google import genai
+    from google.genai import types
+    USE_NEW_SDK = True
+except ImportError:
+    import google.generativeai as legacy_genai
+    from google.generativeai.types import HarmCategory, HarmBlockThreshold
+    USE_NEW_SDK = False
 
 # הגדרות עמוד
 st.set_page_config(
@@ -27,12 +36,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # 1. אבטחת מפתח API
-api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
+api_key = (
+    st.secrets.get("GEMINI_API_KEY")
+    or st.secrets.get("GOOGLE_API_KEY")
+    or os.getenv("GEMINI_API_KEY")
+    or os.getenv("GOOGLE_API_KEY")
+)
+
 if not api_key:
     st.error("שגיאה: מפתח API אינו מוגדר בהגדרות הסודיות (Secrets).")
     st.stop()
 
-genai.configure(api_key=api_key)
+if not USE_NEW_SDK:
+    legacy_genai.configure(api_key=api_key)
 
 # 2. כותרת עליונה וסמלים
 st.markdown("""
@@ -142,9 +158,32 @@ def get_ai_response(query_text, course_data, updates_text):
 
 שאלת הסטודנט: {query_text}
 """
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(prompt)
-    return response.text if response.text else "לא התקבלה תשובה, אנא נסח מחדש."
+    if USE_NEW_SDK:
+        client = genai.Client(api_key=api_key)
+        config = types.GenerateContentConfig(
+            safety_settings=[
+                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+            ]
+        )
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config=config
+        )
+        return response.text if response.text else "לא התקבלה תשובה, אנא נסח מחדש."
+    else:
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+        }
+        model = legacy_genai.GenerativeModel("gemini-1.5-flash", safety_settings=safety_settings)
+        response = model.generate_content(prompt)
+        return response.text if response.text else "לא התקבלה תשובה, אנא נסח מחדש."
 
 # ניהול היסטוריית שיחה
 if "messages" not in st.session_state:
@@ -190,11 +229,11 @@ if user_query:
 
     office_updates = get_office_updates()
 
-    # שליפה דרך פונקציית ה-Cache
+    # שליפה דרך פונקציית ה-Cache עם דיווח שגיאה מדויק
     try:
         reply = get_ai_response(user_query.strip(), shnaton_data, office_updates)
-    except Exception:
-        reply = "אירעה שגיאה בעיבוד השאילתה. ניתן לפנות ישירות לנתנאל, נציג המחזור."
+    except Exception as e:
+        reply = f"אירעה שגיאה בעיבוד השאילתה ({e}). ניתן לפנות ישירות לנתנאל, נציג המחזור."
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
