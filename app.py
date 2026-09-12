@@ -5,13 +5,23 @@ from bs4 import BeautifulSoup
 import streamlit as st
 import google.generativeai as genai
 
-st.set_page_config(page_title="עוזר מחזור מדעי התזונה", layout="centered")
+# הגדרות עמוד
+st.set_page_config(
+    page_title="עוזר מחזור מדעי התזונה - הפקולטה לחקלאות",
+    page_icon="🎓",
+    layout="centered"
+)
 
+# התאמת כיווניות ועיצוב (RTL)
 st.markdown("""
 <style>
     .stApp { direction: rtl; text-align: right; }
     .stTextInput input { direction: rtl; text-align: right; }
     .stChatMessage { direction: rtl; text-align: right; }
+    div[data-testid="stLinkButton"] a {
+        text-align: center !important;
+        font-weight: bold !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -23,7 +33,32 @@ if not api_key:
 
 genai.configure(api_key=api_key)
 
-# 2. מיפוי קורסים בתואר (זיהוי לוקלי ב-0 טוקנים)
+# 2. חלק עליון: סמל הפקולטה לחקלאות וסמל מדעי התזונה
+st.markdown("""
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 2px solid #2e7d32; margin-bottom: 18px; background-color: #ffffff; border-radius: 8px;">
+    <div>
+        <img src="https://study.agri.huji.ac.il/sites/default/files/agri-study/files/faculty-logo.jpg" alt="הפקולטה לחקלאות מזון וסביבה" style="height: 60px; max-width: 100%;">
+    </div>
+    <div style="text-align: left; line-height: 1.2;">
+        <span style="font-size: 17px; font-weight: bold; color: #1b5e20; display: block;">האוניברסיטה העברית בירושלים</span>
+        <span style="font-size: 14px; font-weight: 600; color: #333;">בית הספר למדעי התזונה</span>
+        <span style="font-size: 12px; color: #666; display: block;">מסלולים 712-1212 | 712-1225</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# 3. כפתורי גישה מהירה קבועים בראש העמוד
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.link_button("תקנון ונהלים", "https://studentsadmin.huji.ac.il/study", use_container_width=True)
+with col2:
+    st.link_button("שנתון הקורסים", "https://shnaton.huji.ac.il", use_container_width=True)
+with col3:
+    st.link_button("פורטל מידע אישי", "https://studentservices.huji.ac.il", use_container_width=True)
+
+st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
+
+# 4. מיפוי קורסים בתואר
 COURSES_MAP = {
     "כימיה כללית": "71011",
     "כימיה אורגנית": "71014",
@@ -38,40 +73,34 @@ COURSES_MAP = {
 }
 
 def get_office_updates():
-    """קריאת עדכוני המזכירות מקובץ updates.txt"""
     if os.path.exists("updates.txt"):
         with open("updates.txt", "r", encoding="utf-8") as f:
             return f.read().strip()
     return "אין עדכונים חריגים מהמזכירות."
 
 def fetch_shnaton_info(course_id):
-    """שליפה ממוקדת מדף הקורס בשנתון העברית"""
     url = f"https://shnaton.huji.ac.il/course/{course_id}"
     try:
         headers = {"User-Agent": "Mozilla/5.0"}
         r = requests.get(url, headers=headers, timeout=5)
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, "html.parser")
-            text = soup.get_text(separator=" ", strip=True)
-            return text[:1500]
+            return soup.get_text(separator=" ", strip=True)[:1500]
     except Exception:
         pass
-    return f"לצפייה בלוח הבחינות והסילבוס המלא: {url}"
+    return f"לצפייה בפרטי הקורס המלאים בשנתון: {url}"
 
-# ניהול מצב שיחה
+# ניהול היסטוריית שיחה
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "last_query_time" not in st.session_state:
     st.session_state.last_query_time = 0.0
 
-st.title("עוזר מידע ונהלים - מדעי התזונה")
-st.caption("חוג 712 | מסלולים 1212 ו-1225 | הפקולטה לחקלאות")
-
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-user_query = st.chat_input("שאל/י על קורס, מועדי בחינות, תקנון או שנתון...")
+user_query = st.chat_input("שאל/י על קורס, מועדי בחינות, תקנון או נהלים...")
 
 if user_query:
     current_time = time.time()
@@ -88,7 +117,6 @@ if user_query:
     with st.chat_message("user"):
         st.write(user_query)
 
-    # בדיקה אם זוהה קורס ספציפי
     matched_course_id = None
     for name, cid in COURSES_MAP.items():
         if name in user_query or cid in user_query:
@@ -112,6 +140,7 @@ if user_query:
 - תקנון לימודים ומינהל תלמידים: https://studentsadmin.huji.ac.il/study
 - פרק 7 (בחינות ומועדים מיוחדים): https://studentsadmin.huji.ac.il/exams
 - שנתון העברית: https://shnaton.huji.ac.il
+- פורטל מידע אישי: https://studentservices.huji.ac.il
 - מסלול מדעי התזונה (1212 ו-1225): https://info.huji.ac.il/bachelor/Nutrition-Sciences
 
 מידע נקודתי שנשלף לשאילתה זו:
@@ -130,7 +159,7 @@ if user_query:
         response = model.generate_content(prompt)
         reply = response.text
     except Exception:
-        reply = "אירעה שגיאה. ניתן לפנות ישירות לנתנאל, נציג המחזור."
+        reply = "אירעה שגיאה בעיבוד השאילתה. ניתן לפנות ישירות לנתנאל, נציג המחזור."
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
