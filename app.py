@@ -1,6 +1,3 @@
-הנה כל הקוד המלא והמעודכן כקובץ אחד שלם. תוכל להעתיק את כל הבלוק שלהלן ולהחליף איתו את כל התוכן בקובץ שלך ב-GitHub:
-
-```python
 import streamlit as st
 import os
 import google.generativeai as genai
@@ -191,5 +188,3 @@ if user_query:
                 err_msg = f"אירעה שגיאה בעיבוד התשובה: {e}"
                 st.error(err_msg)
                 st.session_state.messages.append({"role": "assistant", "content": err_msg})
-
-```
