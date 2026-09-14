@@ -1,240 +1,195 @@
-import os
-import re
-import json
-import time
-import requests
-from bs4 import BeautifulSoup
+הנה כל הקוד המלא והמעודכן כקובץ אחד שלם. תוכל להעתיק את כל הבלוק שלהלן ולהחליף איתו את כל התוכן בקובץ שלך ב-GitHub:
+
+```python
 import streamlit as st
+import os
+import google.generativeai as genai
 
-# תמיכה בספרייה החדשה (google-genai) עם תאימות לאחור
-try:
-    from google import genai
-    from google.genai import types
-    USE_NEW_SDK = True
-except ImportError:
-    import google.generativeai as legacy_genai
-    from google.generativeai.types import HarmCategory, HarmBlockThreshold
-    USE_NEW_SDK = False
-
-# הגדרות עמוד
+# הגדרת תצורת הדף והמיתוג
 st.set_page_config(
-    page_title="עוזר מחזור מדעי התזונה - הפקולטה לחקלאות",
+    page_title="מדעי התזונה (חוג 712) | מסלולים 1212 ו-1225",
     page_icon="🎓",
-    layout="centered"
+    layout="centered",
+    initial_sidebar_state="collapsed"
 )
 
-st.markdown("""
-<style>
-    .stApp { direction: rtl; text-align: right; }
-    .stTextInput input { direction: rtl; text-align: right; }
-    .stChatMessage { direction: rtl; text-align: right; }
-    div[data-testid="stLinkButton"] a {
-        text-align: center !important;
-        font-weight: bold !important;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# 1. אבטחת מפתח API
-api_key = (
-    st.secrets.get("GEMINI_API_KEY")
-    or st.secrets.get("GOOGLE_API_KEY")
-    or os.getenv("GEMINI_API_KEY")
-    or os.getenv("GOOGLE_API_KEY")
-)
-
+# הגדרת מפתח ה-API של Gemini (מתוך Streamlit Secrets או משתנה סביבה)
+api_key = st.secrets.get("GEMINI_API_KEY", "")
 if not api_key:
-    st.error("שגיאה: מפתח API אינו מוגדר בהגדרות הסודיות (Secrets).")
-    st.stop()
+    api_key = os.getenv("GEMINI_API_KEY", "")
 
-if not USE_NEW_SDK:
-    legacy_genai.configure(api_key=api_key)
+if api_key:
+    genai.configure(api_key=api_key)
 
-# 2. כותרת עליונה וסמלים
-st.markdown("""
-<div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 2px solid #2e7d32; margin-bottom: 18px; background-color: #ffffff; border-radius: 8px;">
-    <div>
-        <img src="https://study.agri.huji.ac.il/sites/default/files/agri-study/files/faculty-logo.jpg" alt="הפקולטה לחקלאות מזון וסביבה" style="height: 60px; max-width: 100%;">
+# כותרת ומיתוג מוסדי רשמי
+st.markdown(
+    """
+    <div style="text-align: right; direction: rtl; padding-bottom: 8px;">
+        <h3 style="margin-bottom: 2px; color: #1E3A8A;">האוניברסיטה העברית בירושלים</h3>
+        <h4 style="margin-top: 0px; margin-bottom: 4px; color: #374151;">הפקולטה לחקלאות, מזון וסביבה ע"ש רוברט ה. סמית | קמפוס רחובות</h4>
+        <h2 style="margin-top: 2px; color: #047857;">בית הספר למדעי התזונה (חוג 712)</h2>
+        <p style="font-size: 1.05em; color: #4B5563; margin-bottom: 0px;">
+            <b>מסלול 1212</b> (חד-חוגי קליני) | <b>מסלול 1225</b> (עם חטיבה באגרו-אינפורמטיקה)
+        </p>
     </div>
-    <div style="text-align: left; line-height: 1.2;">
-        <span style="font-size: 17px; font-weight: bold; color: #1b5e20; display: block;">האוניברסיטה העברית בירושלים</span>
-        <span style="font-size: 14px; font-weight: 600; color: #333;">בית הספר למדעי התזונה</span>
-        <span style="font-size: 12px; color: #666; display: block;">חוג 712 | מסלולים 1212 ו-1225</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    <hr style="margin-top: 6px; margin-bottom: 18px;">
+    """,
+    unsafe_allow_html=True
+)
 
-# 3. כפתורי שנתון מפוצלים וגישה מהירה
-col_r1_1, col_r1_2 = st.columns(2)
-with col_r1_1:
-    st.link_button("שנתון מסלול 1212 (חד-חוגי)", "https://shnaton.huji.ac.il/roadmap/712-1212", use_container_width=True)
-with col_r1_2:
-    st.link_button("שנתון מסלול 1225 (עם אגרו-אינפורמטיקה)", "https://shnaton.huji.ac.il/roadmap/712-1225", use_container_width=True)
+# רשת כפתורי קישורים מהירים
+st.markdown("<h5 style='text-align: right; direction: rtl; margin-bottom: 10px;'>קישורים אקדמיים חיוניים:</h5>", unsafe_allow_html=True)
 
-col_r2_1, col_r2_2 = st.columns(2)
-with col_r2_1:
-    st.link_button("תקנון ונהלים (מינהל תלמידים)", "https://studentsadmin.huji.ac.il/study", use_container_width=True)
-with col_r2_2:
-    st.link_button("פורטל מידע אישי לסטודנט", "https://studentservices.huji.ac.il", use_container_width=True)
+col1, col2 = st.columns(2)
+with col1:
+    st.link_button(
+        "📘 שנתון מסלול 1212 (קליני)",
+        "https://shnaton.huji.ac.il/roadmap/712-1212",
+        use_container_width=True
+    )
+    st.link_button(
+        "📜 תקנון ונהלי הוראה (מינהל תלמידים)",
+        "https://academic-secretary.huji.ac.il/%D7%AA%D7%A7%D7%A0%D7%95%D7%A0%D7%99%D7%9D",
+        use_container_width=True
+    )
 
-st.markdown("<hr style='margin: 15px 0;'>", unsafe_allow_html=True)
+with col2:
+    st.link_button(
+        "💻 שנתון מסלול 1225 (אגרו-אינפורמטיקה)",
+        "https://shnaton.huji.ac.il/roadmaps/008",
+        use_container_width=True
+    )
+    st.link_button(
+        "👤 פורטל מידע אישי לסטודנט",
+        "https://studentservices.huji.ac.il",
+        use_container_width=True
+    )
 
-# 4. טעינת קובצי הקורסים
-def load_json_file(filename):
-    if os.path.exists(filename):
-        with open(filename, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except Exception:
-                pass
-    return {}
+# כפתור רוחבי בולט ללוח השנה האקדמי תשפ"ז
+st.link_button(
+    "📅 לוח השנה האקדמי תשפ\"ז (2026–2027) | המינהל האקדמי",
+    "https://academic-secretary.huji.ac.il/%D7%9C%D7%95%D7%97-%D7%A9%D7%A0%D7%94-%D7%90%D7%A7%D7%93%D7%9E%D7%99",
+    use_container_width=True
+)
 
-c_1212_mand = load_json_file("courses_1212_mandatory.json")
-c_1212_elec = load_json_file("courses_1212_elective.json")
-c_1225_mand = load_json_file("courses_1225_mandatory.json")
-c_1225_elec_dept = load_json_file("courses_1225_elective_dept.json")
-c_1225_elec_agro = load_json_file("courses_1225_elective_agro.json")
+st.markdown("<hr style='margin-top: 18px; margin-bottom: 20px;'>", unsafe_allow_html=True)
 
-ALL_COURSES = {}
-for d in [c_1212_mand, c_1212_elec, c_1225_mand, c_1225_elec_dept, c_1225_elec_agro]:
-    ALL_COURSES.update(d)
+# בסיס הידע האקדמי ופרומפט המערכת של המודל
+NUTRITION_PROGRAMS_KNOWLEDGE = """
+=== אודות בית הספר למדעי התזונה (חוג 712) בפקולטה לחקלאות ברחובות ===
+- מיקום: קמפוס רחובות ע"ש רוברט ה. סמית, האוניברסיטה העברית בירושלים.
+- היקף התואר: 150 נקודות זכות (נ"ז) הנפרסות על פני 4 שנות לימוד.
+- שפת ההוראה: עברית (קיימת חובת לימוד של לפחות שני קורסים בשפה האנגלית במהלך התואר).
 
-def get_office_updates():
-    if os.path.exists("updates.txt"):
-        with open("updates.txt", "r", encoding="utf-8") as f:
-            return f.read().strip()
-    return "אין עדכונים חריגים מהמזכירות."
+1. מסלול 1212 - מדעי התזונה, חד-חוגי, ארבע שנתי (המסלול הקליני):
+   - מטרתו: הכשרת אנשי מקצוע מוסמכים לתזונה קלינית, בריאות הציבור, הדרכה ומחקר.
+   - החל משנת הלימודים תשפ"ה, ההכשרה המעשית (סטאז' קליני בבתי חולים ובמרפאות קהילתיות) משולבת באופן מובנה כחלק מתוכנית הלימודים לתואר.
+   - לימודי יסוד: כימיה כללית ופיזיקלית, כימיה אורגנית, פיזיקה למדעי החקלאות, חדו"א (71054), סטטיסטיקה ויישומי מחשב.
+   - לימודי ליבה מתקדמים: ביוכימיה כללית ומבנית, ביוכימיה של התזונה, פיזיולוגיה של האדם, ביולוגיה מולקולרית של התא, גנטיקה, אפידמיולוגיה, תזונת האדם במעגל החיים, תזונה קלינית מורחבת וטיפול דיאטטי במחלות.
+   - סיום המסלול מעניק תואר בוגר B.Sc. במדעי התזונה ומאפשר לגשת לבחינת הרישוי הממשלתית של משרד הבריאות לצורך קבלת תעודת דיאטן/ית קליני/ת.
 
-@st.cache_data(ttl=86400)
-def fetch_shnaton_info(course_id):
-    """שליפה מהשנתון עם שמירה בזיכרון מטמון ל-24 שעות"""
-    url = f"https://shnaton.huji.ac.il/course/{course_id}"
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(url, headers=headers, timeout=5)
-        if r.status_code == 200:
-            soup = BeautifulSoup(r.text, "html.parser")
-            return soup.get_text(separator=" ", strip=True)[:1500]
-    except Exception:
-        pass
-    return f"לצפייה בפרטי הקורס המלאים בשנתון: {url}"
-
-@st.cache_data(ttl=86400)
-def get_ai_response(query_text, course_data, updates_text):
-    """מנגנון עיבוד עם Cache: שאלות חוזרות נשלפות ב-0 טוקנים מהזיכרון"""
-    prompt = f"""
-אתה העוזר של מחזור מדעי התזונה באוניברסיטה העברית (נציג המחזור: נתנאל גוטליב).
-ענה אך ורק על בסיס הנתונים הבאים וצרף קישורים רשמיים.
-
-מבנה המסלולים והקורסים:
-- מסלול 712-1212 (מדעי התזונה 4 שנתי):
-  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1212
-  * קורסי חובה: {list(c_1212_mand.keys())}
-  * קורסי חובת בחירה: {list(c_1212_elec.keys())}
-
-- מסלול 712-1225 (מדעי התזונה עם חטיבה באגרו-אינפורמטיקה):
-  * מפת מסלול ישירה: https://shnaton.huji.ac.il/roadmap/712-1225
-  * קורסי חובה: {list(c_1225_mand.keys())}
-  * קורסי חובת בחירה חוג: {list(c_1225_elec_dept.keys())}
-  * קורסי חובת בחירה חטיבה באגרו: {list(c_1225_elec_agro.keys())}
-
-עדכוני מזכירות אחרונים:
-{updates_text}
-
-קישורים רשמיים כלליים:
-- תקנון לימודים: https://studentsadmin.huji.ac.il/study
-- פרק 7 (בחינות ומועדים מיוחדים): https://studentsadmin.huji.ac.il/exams
-- שנתון העברית: https://shnaton.huji.ac.il
-- פורטל מידע אישי: https://studentservices.huji.ac.il
-
-מידע שנשלף מהשנתון עבור קורס ספציפי (אם נשאל):
-{course_data}
-
-כללים:
-1. הפניה לשנתון לפי מסלול: אם השאלה נוגעת למסלול 1212 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1212, ואם היא נוגעת למסלול 1225 צרף את הקישור הישיר https://shnaton.huji.ac.il/roadmap/712-1225.
-2. אבחנה בחובת בחירה של 1225: הקפד להבדיל בבירור בין קורסי חובת בחירה של החוג לבין קורסי חובת בחירה של חטיבת אגרו-אינפורמטיקה.
-3. לפניות אישיות: הפנה ישירות לנתנאל גוטליב, נציג המחזור.
-4. סגנון: ענייני, תמציתי (עד 3 משפטים) ובעברית.
-
-שאלת הסטודנט: {query_text}
+2. מסלול 1225 - מדעי התזונה, חד-חוגי עם חטיבה באגרו-אינפורמטיקה, ארבע שנתי:
+   - מסלול יוקרתי המשלב את הידע המדעי בתזונת האדם עם חטיבה מעמיקה באגרו-אינפורמטיקה ובמדעי הנתונים.
+   - מקנה מיומנויות תכנות מתקדמות (פייתון), ניתוח מאגרי נתונים ביולוגיים, סטטיסטיקה חישובית, ביואינפורמטיקה, עיבוד נתונים ומודלים חישוביים בתזונה ובמזון.
+   - מכשיר בוגרים להובלת מחקרים עתירי נתונים, פיתוח בחברות פוד-טק וביוטק, מערכות בריאות דיגיטליות, וביו-אינפורמטיקה רפואית.
 """
-    if USE_NEW_SDK:
-        client = genai.Client(api_key=api_key)
-        config = types.GenerateContentConfig(
-            safety_settings=[
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-            ]
-        )
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt,
-            config=config
-        )
-        return response.text if response.text else "לא התקבלה תשובה, אנא נסח מחדש."
-    else:
-        safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        }
-        model = legacy_genai.GenerativeModel("gemini-1.5-flash", safety_settings=safety_settings)
-        response = model.generate_content(prompt)
-        return response.text if response.text else "לא התקבלה תשובה, אנא נסח מחדש."
 
-# ניהול היסטוריית שיחה
+HUJI_ACADEMIC_CALENDAR_2026_2027 = """
+=== לוח השנה האקדמי של האוניברסיטה העברית לשנת תשפ"ז (2026–2027) ===
+(נתונים רשמיים מאתר המינהל האקדמי של האוניברסיטה העברית)
+
+סמסטר א':
+- פתיחת שנת הלימודים וסמסטר א': יום ראשון, ל' בתשרי תשפ"ז, 11.10.2026 (בכל הקמפוסים).
+- שבתון - בחירות לכנסת ה-26: יום שלישי, ט"ז בחשוון תשפ"ז, 27.10.2026 (לא יתקיימו לימודים או בחינות).
+- בחינות פסיכומטריות: יום שישי, כ"ד בכסלו, 04.12.2026 (שיעורים א-סינכרוניים/זום בקמפוס הר הצופים בלבד; בקמפוס רחובות הלימודים מתקיימים כסדרם).
+- חופשת חורף וחנוכה: יום ראשון עד שבת, כ"ו בכסלו – ב' בטבת, 06.12.2026 – 12.12.2026 (לא יתקיימו לימודים או בחינות).
+- חופשת חג המולד: יום שישי, 25.12.2026 (לא יתקיימו לימודים או בחינות).
+- סיום סמסטר א': יום שישי, ז' בשבט תשפ"ז, 15.01.2027 (כולל).
+- תקופת בחינות סמסטר א': ממוצאי סיום הסמסטר (אמצע ינואר 2027) ועד תחילת מרץ 2027.
+
+סמסטר ב':
+- פתיחת סמסטר ב': יום ראשון, כ"ח באדר א' תשפ"ז, 07.03.2027 (בכל הקמפוסים).
+- עיד אל-פיטר: יום חמישי, 11.03.2027 (לא יתקיימו לימודים או בחינות).
+- חופשת פורים ושושן פורים: ימים שלישי ורביעי, י"ד–ט"ו באדר ב', 23.03.2027 – 24.03.2027 (לא יתקיימו לימודים או בחינות).
+- חופשת פסח: יום ראשון, י"א בניסן – שבת, כ"ד בניסן, 18.04.2027 – 01.05.2027 (לא יתקיימו לימודים או בחינות).
+- ערב יום הזיכרון לשואה ולגבורה: יום שני, כ"ו בניסן, 03.05.2027 (הלימודים מסתיימים בשעה 18:00).
+- יום הזיכרון לשואה ולגבורה: יום שלישי, כ"ז בניסן, 04.05.2027 (לא יתקיימו בחינות; הפסקת לימודים וטקס זיכרון בין 09:45 ל-10:45 בכל הקמפוסים כולל קמפוס רחובות. החרגה: בקמפוס עין כרם ההפסקה ב-12:00–13:00).
+- ערב יום הזיכרון לחללי מערכות ישראל: יום שני, ג' באייר, 10.05.2027 (הלימודים מסתיימים בשעה 16:00).
+- יום הזיכרון ויום העצמאות: ימים שלישי ורביעי, ד'–ה' באייר, 11.05.2027 – 12.05.2027 (לא יתקיימו לימודים או בחינות).
+- עיד אל-אדחא: יום שני, 17.05.2027 (לא יתקיימו לימודים או בחינות).
+- חופשת שבועות: ימים חמישי ושישי, ה'–ו' בסיוון, 10.06.2027 – 11.06.2027 (לא יתקיימו לימודים או בחינות).
+- חופשת סטודנטים: יום ראשון, ט"ו בסיוון, 20.06.2027 (לא יתקיימו לימודים או בחינות).
+- ימי השלמת מערכת שעות לקראת סוף סמסטר ב':
+  * ימים א'-ב', 27-28.06.2027: תילמד מערכת שעות של ימי ד' ו-ה' בהתאמה.
+  * יום ג', 29.06.2027: תילמד מערכת שעות של יום ג'.
+- סיום סמסטר ב': יום שלישי, כ"ד בסיוון תשפ"ז, 29.06.2027 (כולל).
+- תקופת בחינות סמסטר ב': יולי-אוגוסט 2027.
+- צום תשעה באב: יום חמישי, ט' באב תשפ"ז, 12.08.2027 (האוניברסיטה סגורה).
+"""
+
+SYSTEM_PROMPT = f"""
+אתה עוזר ההוראה והייעוץ האקדמי הרשמי של בית הספר למדעי התזונה (חוג 712) בפקולטה לחקלאות, מזון וסביבה ע"ש רוברט ה. סמית של האוניברסיטה העברית בירושלים.
+תפקידך לתת מענה מוסמך, מדויק, נעים וברור לסטודנטים ולמתעניינים.
+
+מידע אקדמי על שני המסלולים:
+{NUTRITION_PROGRAMS_KNOWLEDGE}
+
+מידע על לוח השנה האקדמי תשפ"ז (2026–2027):
+{HUJI_ACADEMIC_CALENDAR_2026_2027}
+
+=== כללי מענה מחייבים ===
+1. ציון קמפוסים במענה (דגש קריטי):
+   - בכל תשובה העוסקת בתאריכים, סמסטרים, פתיחת/סיום שנה, ימי חופשה או טקסים, חובה לציין במפורש באילו קמפוסים מדובר.
+   - הדגש תמיד כי הלימודים של החוג למדעי התזונה (מסלול 1212 ומסלול 1225) מתקיימים ב**קמפוס רחובות (הפקולטה לחקלאות)**.
+   - אם קיימת החרגה הנוגעת לקמפוסים אחרים (כגון קמפוס עין כרם ברפואה/רפואת שיניים, או קמפוס הר הצופים בימי פסיכומטרי), ציין זאת בהערה קצרה וממוקדת כדי למנוע בלבול בקרב הסטודנטים ברחובות.
+2. דיוק במסלולים:
+   - כאשר סטודנט שואל לגבי חובות לימודים, קורסים או סטאז', הבחן האם מדובר במסלול 1212 (הקליני) או במסלול 1225 (המשלב חטיבה באגרו-אינפורמטיקה).
+3. סגנון תשובה:
+   - ענה בעברית רהוטה וברורה, בנקודות מסודרות, ותוך הפניה לקישורים הרלוונטיים במידת הצורך.
+"""
+
+# ניהול היסטוריית השיחה
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "last_query_time" not in st.session_state:
-    st.session_state.last_query_time = 0.0
 
+# הצגת היסטוריית השיחה
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+        st.markdown(msg["content"])
 
-user_query = st.chat_input("שאל/י על קורס, חובת בחירה, מסלול 1212/1225, תקנון...")
+# שדה קלט לצ'אט
+user_query = st.chat_input("שאל/י על קורס, חובת בחירה, מסלול 1212/1225, לוח השנה האקדמי תשפ\"ז...")
 
 if user_query:
-    current_time = time.time()
-    if current_time - st.session_state.last_query_time < 3.0:
-        st.warning("נא להמתין מספר שניות בין שאילתות.")
-        st.stop()
-    if len(user_query.strip()) > 250:
-        st.warning("השאלה ארוכה מדי. נא לקצר עד 250 תווים.")
-        st.stop()
-
-    st.session_state.last_query_time = current_time
     st.session_state.messages.append({"role": "user", "content": user_query})
-
     with st.chat_message("user"):
-        st.write(user_query)
+        st.markdown(user_query)
 
-    # זיהוי מספר קורס בן 5 ספרות או שם קורס
-    matched_course_id = None
-    number_match = re.search(r'\b\d{5}\b', user_query)
-    if number_match:
-        matched_course_id = number_match.group(0)
-    else:
-        for name, cid in ALL_COURSES.items():
-            if name in user_query:
-                matched_course_id = cid
-                break
-
-    shnaton_data = ""
-    if matched_course_id:
-        shnaton_data = f"\nמידע שנשלף מהשנתון לקורס {matched_course_id}:\n" + fetch_shnaton_info(matched_course_id)
-
-    office_updates = get_office_updates()
-
-    # שליפה דרך פונקציית ה-Cache עם דיווח שגיאה מדויק
-    try:
-        reply = get_ai_response(user_query.strip(), shnaton_data, office_updates)
-    except Exception as e:
-        reply = f"אירעה שגיאה בעיבוד השאילתה ({e}). ניתן לפנות ישירות לנתנאל, נציג המחזור."
-
-    st.session_state.messages.append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
-        st.write(reply)
+        if not api_key:
+            reply = "⚠️ נא להגדיר מפתח `GEMINI_API_KEY` בהגדרות ה-Secrets של Streamlit כדי להפעיל את מודל המענה."
+            st.markdown(reply)
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+        else:
+            try:
+                model = genai.GenerativeModel(
+                    model_name="gemini-1.5-flash",
+                    system_instruction=SYSTEM_PROMPT
+                )
+                
+                # המרת היסטוריית ההודעות למבנה המתאים ל-Gemini
+                chat_history = []
+                for m in st.session_state.messages[:-1]:
+                    role = "user" if m["role"] == "user" else "model"
+                    chat_history.append({"role": role, "parts": [m["content"]]})
+                
+                chat = model.start_chat(history=chat_history)
+                response = chat.send_message(user_query)
+                st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+            except Exception as e:
+                err_msg = f"אירעה שגיאה בעיבוד התשובה: {e}"
+                st.error(err_msg)
+                st.session_state.messages.append({"role": "assistant", "content": err_msg})
+
+```
